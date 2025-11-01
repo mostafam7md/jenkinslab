@@ -39,12 +39,12 @@ node('jenkins') {
     }
 
     stage('Deploy') {
-        echo "🚀 Deploying container..."
-        sh '''
-            docker stop python-app || true
-            docker rm python-app || true
-            docker run -d -p 9000:8080 --name python-app ${IMAGE_NAME}:${BUILD_NUMBER}
-        '''
+        echo "Deploying container"
+        sh """
+           docker stop python-app || true
+           docker rm python-app || true
+           docker run -d -p 9000:8080 --name python-app ${IMAGE_NAME}:${env.BUILD_NUMBER}
+         """
     }
 
     try {
