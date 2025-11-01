@@ -1,0 +1,60 @@
+node('jenkins') {
+
+    def IMAGE_NAME = "mostafam7md/jenkinslab"
+
+    stage('Setup Tools') {
+        echo "Using Maven and Java from Jenkins Tools"
+        env.PATH = "${tool 'mvn-3.5.2'}/bin:${tool 'java - 11'}/bin:${env.PATH}"
+    }
+
+    stage('Build') {
+        echo "Fetching repo and building with Maven..."
+        git branch: 'main', url: 'https://github.com/mostafam7md/jenkinslab'
+        sh 'ls -l'
+        sh 'mvn clean package'
+
+        echo "Build Number: ${env.BUILD_NUMBER}"
+        if (env.BUILD_NUMBER.toInteger() < 5) {
+            error(" Build number is less than 5 ")
+        }
+    }
+
+    stage('Docker Build') {
+        echo "Building Docker image..."
+        sh "docker build -t ${IMAGE_NAME}:${env.BUILD_NUMBER} ."
+    }
+
+    stage('Docker Login') {
+        echo "Logging in to DockerHub"
+        withCredentials([string(credentialsId: 'DOCKER_PASS', variable: 'DOCKER_PASS')]) {
+            sh '''
+                echo "$DOCKER_PASS" | docker login -u "mostafam7md" --password-stdin
+            '''
+        }
+    }
+
+    stage('Docker Push') {
+        echo "Pushing Docker image..."
+        sh "docker push ${IMAGE_NAME}:${env.BUILD_NUMBER}"
+    }
+
+    stage('Deploy') {
+        echo "🚀 Deploying container..."
+        sh '''
+            docker stop python-app || true
+            docker rm python-app || true
+            docker run -d -p 9000:8080 --name python-app ${IMAGE_NAME}:${BUILD_NUMBER}
+        '''
+    }
+
+    try {
+        echo "Build and deployment completed successfully"
+    } catch (err) {
+        echo "Pipeline failed: ${err}"
+        currentBuild.result = 'FAILURE'
+        throw err
+    } finally {
+        echo "Cleaning workspace"
+        cleanWs()
+    }
+}

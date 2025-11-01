@@ -1,23 +1,84 @@
 pipeline {
-    agent {
+   agent {
         label 'jenkins'
     }
 
     tools {
-        maven 'mvn-3-5-2'
-        jdk 'java-11'
+        maven 'mvn-3.5.2'
+        jdk 'java - 11'
     }
-
+    environment {
+        IMAGE_NAME = "mostafam7md/jenkinslab"
+    }
     stages {
-        stage('Build') { 
-            steps {
-                sh 'mvn package install'
+        stage('Build') {
+            steps {        
+                script {
+                git branch: 'main', url: 'https://github.com/mostafam7md/jenkinslab'
+                sh "ls -l"
+                sh "mvn clean package"
+                    echo "Build Number: ${currentBuild.number}"
+                    if (currentBuild.number < 5) {
+                        error(" Build number is less than 5")
+                    }
+                }
+                
             }
         }
-        stage('Test') { 
+
+        stage('Docker Build') {
             steps {
-                sh 'mvn test'
+                sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} ."
             }
+        }
+
+        stage('Docker Login') {
+            steps {
+                withCredentials([string(credentialsId: 'DOCKER_PASS', variable: 'DOCKER_PASS')]) {
+                    
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "mostafam7md" --password-stdin
+                        '''
+                }
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                sh "docker push ${IMAGE_NAME}:${BUILD_NUMBER}"
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh """
+                echo "🚀 Deploying container..."
+
+                # Stop & remove old container if exists
+                docker stop python-app || true
+                docker rm python-app || true
+
+                # Run new container on port 9000 instead of 8080
+                docker run -d -p 9000:8080 --name python-app ${IMAGE_NAME}:${BUILD_NUMBER}
+
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "success"
+        }
+        failure {
+            echo "failed"
+        }
+        always {
+            echo "Cleaning workspace"
+            cleanWs()
         }
     }
 }
+
+
+
