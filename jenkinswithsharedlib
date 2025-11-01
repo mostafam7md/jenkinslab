@@ -1,0 +1,49 @@
+@Library('jenkins-sharedlib') _
+
+pipeline {
+    agent { label 'jenkins' }
+    tools { maven 'mvn-3.5.2' }
+
+    environment {
+        IMG = "https://github.com/mostafam7md/jenkins-sharedlib"
+        TAG = "${BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/mostafam7md/jenkins-sharedlib'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh "mvn clean package"
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                buildImage(IMG, TAG)
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                login("mostafam7md", "DOCKER_PASS")
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                pushImage(IMG, TAG)
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                deploy(IMG, TAG)
+            }
+        }
+    }
+}
